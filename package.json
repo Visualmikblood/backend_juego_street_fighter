@@ -1,13 +1,31 @@
 {
-  "name": "juego_street_fighter_server",
+  "name": "street-fighter-server",
   "version": "1.0.0",
+  "description": "Servidor para el juego Street Fighter con Socket.IO",
   "type": "module",
   "main": "servidor.js",
   "scripts": {
-    "start": "node servidor.js"
+    "start": "node servidor.js",
+    "dev": "nodemon servidor.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "keywords": [
+    "socket.io",
+    "express",
+    "street-fighter",
+    "game-server"
+  ],
+  "author": "TuNombre",
+  "license": "MIT",
   "dependencies": {
-     "express": "^4.18.2",
+    "express": "^4.18.2",
     "socket.io": "^4.8.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
   }
 }
