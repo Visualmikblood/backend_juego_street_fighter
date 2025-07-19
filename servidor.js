@@ -15,25 +15,11 @@ const CORS_ORIGIN = process.env.CORS_ORIGIN || "*";
 let gameLoopInterval = null;
 let gameTimer = null;
 
-// Configuración básica HTTP (requerido para Railway)
-app.get('/', (req, res) => {
-  res.status(200).json({
-    status: 'online',
-    message: 'Servidor Street Fighter funcionando',
-    socket: `ws://${req.get('host')}`,
-    players: {
-      player1: !!gameState.player1,
-      player2: !!gameState.player2
-    }
-  });
-});
-
 // Configuración Socket.IO con CORS y recuperación de conexión
 const io = new Server(server, {
   cors: {
     origin: CORS_ORIGIN,
-    methods: ["GET", "POST"],
-    credentials: true
+    methods: ["GET", "POST"]
   },
   connectionStateRecovery: {
     maxDisconnectionDuration: 120000,
@@ -65,6 +51,20 @@ let gameState = {
   }
 };
 
+// Configuración básica HTTP (requerido para Railway)
+app.get('/', (req, res) => {
+  const host = req.get('host') || `localhost:${PORT}`;
+  res.status(200).json({
+    status: 'online',
+    message: 'Servidor Street Fighter funcionando',
+    socket: `ws://${host}`,
+    players: {
+      player1: !!gameState.player1,
+      player2: !!gameState.player2
+    }
+  });
+});
+
 // Funciones de broadcast mejoradas
 const broadcastPlayersUpdate = () => {
   const connectedPlayers = 
@@ -79,6 +79,7 @@ const broadcastPlayersUpdate = () => {
 };
 
 const broadcastGameState = () => {
+  if (!gameState.game) return;
   try {
     io.emit("gameStateUpdate", gameState.game);
   } catch (error) {
@@ -237,7 +238,7 @@ io.on("connection", (socket) => {
   // Asignación de jugador mejorada
   if (!gameState.player1) {
     gameState.player1 = socket.id;
-    socket.emit("assignPlayer", {  // ← Evento renombrado para coincidir con frontend
+    socket.emit("assignPlayer", {
       role: "player1",
       controls: {
         left: "a", right: "d", jump: "w",
@@ -267,7 +268,7 @@ io.on("connection", (socket) => {
   socket.emit("gameStateUpdate", gameState.game);
 
   // Manejo de acciones (actualizado para coincidir con frontend)
-  socket.on("playerAction", (keys) => {  // ← Ahora recibe directamente las teclas
+  socket.on("playerAction", (keys) => {
     if (socket.id === gameState.player1) {
       gameState.player1Keys = keys;
     } else if (socket.id === gameState.player2) {
@@ -284,6 +285,10 @@ io.on("connection", (socket) => {
 
     console.log(`Juego iniciado por: ${socket.id}`);
     
+    // Limpiar intervalos previos
+    clearInterval(gameLoopInterval);
+    clearInterval(gameTimer);
+
     // Reiniciar estado del juego
     gameState.game = {
       player1: {
@@ -360,7 +365,6 @@ server.listen(PORT, () => {
 // Manejo de errores global
 process.on('uncaughtException', (error) => {
   console.error('⚠️ Excepción no capturada:', error);
-  // No salir del proceso para mantener el servidor activo
 });
 
 process.on('unhandledRejection', (reason, promise) => {
