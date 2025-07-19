@@ -1,13 +1,29 @@
-// servidor.js
-import { Server } from "socket.io";
+import express from 'express';
+import { Server } from 'socket.io';
+import { createServer } from 'http';
 
+const app = express();
+const server = createServer(app);
 const PORT = process.env.PORT || 3001;
-const io = new Server(PORT, {
-  cors: {
-    origin: "*",
-  },
+
+// Configuración básica HTTP
+app.get('/', (req, res) => {
+  res.status(200).json({
+    status: 'online',
+    message: 'Servidor Street Fighter funcionando',
+    socket: `ws://${req.get('host')}`
+  });
 });
 
+// Configuración Socket.IO
+const io = new Server(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
+});
+
+// Estado del juego
 let gameState = {
   player1: null,
   player2: null,
@@ -31,8 +47,13 @@ let gameState = {
   }
 };
 
+// Variables para los intervalos
+let gameLoopInterval;
+let gameTimer;
+
+// Funciones de broadcast
 const broadcastPlayersUpdate = () => {
-  const connectedPlayers =
+  const connectedPlayers = 
     (gameState.player1 ? 1 : 0) + (gameState.player2 ? 1 : 0);
   io.emit("playersUpdate", {
     player1Connected: !!gameState.player1,
@@ -45,6 +66,7 @@ const broadcastGameState = () => {
   io.emit("gameStateUpdate", gameState.game);
 };
 
+// Función de ataque
 const performAttack = (attacker, defender, type = 'normal') => {
   const distance = Math.abs(attacker.x - defender.x);
   if (distance < 80) {
@@ -61,13 +83,13 @@ const performAttack = (attacker, defender, type = 'normal') => {
   return { hp: defender.hp, breakCombo: false };
 };
 
-// Game loop del servidor
+// Game loop
 const gameLoop = () => {
   if (!gameState.game.gameStarted || gameState.game.winner) return;
 
   const newGame = { ...gameState.game };
 
-  // Player 1 controls (WASD + FGH)
+  // Jugador 1
   const p1Keys = gameState.player1Keys;
   if (p1Keys['a'] && newGame.player1.x > 50) {
     newGame.player1.x -= 5;
@@ -83,7 +105,6 @@ const gameLoop = () => {
   }
   newGame.player1.isBlocking = p1Keys['g'] || false;
 
-  // Player 1 attack
   if (p1Keys['f'] && !newGame.player1.isAttacking) {
     newGame.player1.isAttacking = true;
     newGame.player1.lastAttackTime = Date.now();
@@ -96,7 +117,6 @@ const gameLoop = () => {
     }, 200);
   }
 
-  // Player 1 special
   if (p1Keys['h'] && newGame.player1.special >= 50) {
     newGame.player1.special -= 50;
     const result = performAttack(newGame.player1, newGame.player2, 'special');
@@ -104,7 +124,7 @@ const gameLoop = () => {
     newGame.player1.combo += 1;
   }
 
-  // Player 2 controls (Arrow keys + 123)
+  // Jugador 2
   const p2Keys = gameState.player2Keys;
   if (p2Keys['arrowleft'] && newGame.player2.x > 50) {
     newGame.player2.x -= 5;
@@ -120,7 +140,6 @@ const gameLoop = () => {
   }
   newGame.player2.isBlocking = p2Keys['2'] || false;
 
-  // Player 2 attack
   if (p2Keys['1'] && !newGame.player2.isAttacking) {
     newGame.player2.isAttacking = true;
     newGame.player2.lastAttackTime = Date.now();
@@ -133,7 +152,6 @@ const gameLoop = () => {
     }, 200);
   }
 
-  // Player 2 special
   if (p2Keys['3'] && newGame.player2.special >= 50) {
     newGame.player2.special -= 50;
     const result = performAttack(newGame.player2, newGame.player1, 'special');
@@ -141,7 +159,7 @@ const gameLoop = () => {
     newGame.player2.combo += 1;
   }
 
-  // Physics for both players
+  // Física
   [newGame.player1, newGame.player2].forEach(player => {
     if (player.isJumping) {
       player.y += player.jumpVelocity;
@@ -154,16 +172,16 @@ const gameLoop = () => {
     }
   });
 
-  // Regenerate special meter
+  // Regeneración
   if (newGame.player1.special < 100) newGame.player1.special += 0.5;
   if (newGame.player2.special < 100) newGame.player2.special += 0.5;
 
-  // Reset combos after inactivity
+  // Combos
   const now = Date.now();
   if (now - newGame.player1.lastAttackTime > 2000) newGame.player1.combo = 0;
   if (now - newGame.player2.lastAttackTime > 2000) newGame.player2.combo = 0;
 
-  // Check for winners
+  // Ganador
   if (newGame.player1.hp <= 0) newGame.winner = 'Player 2';
   else if (newGame.player2.hp <= 0) newGame.winner = 'Player 1';
 
@@ -171,8 +189,7 @@ const gameLoop = () => {
   broadcastGameState();
 };
 
-// Timer countdown
-let gameTimer;
+// Timer del juego
 const startGameTimer = () => {
   if (gameTimer) clearInterval(gameTimer);
   gameTimer = setInterval(() => {
@@ -190,15 +207,15 @@ const startGameTimer = () => {
   }, 1000);
 };
 
-// Game loop interval
-let gameLoopInterval;
+// Iniciar game loop
 const startGameLoop = () => {
   if (gameLoopInterval) clearInterval(gameLoopInterval);
   gameLoopInterval = setInterval(gameLoop, 16);
 };
 
+// Conexiones Socket.IO
 io.on("connection", (socket) => {
-  console.log("User connected: " + socket.id);
+  console.log("User connected:", socket.id);
 
   // Asignar jugador
   if (!gameState.player1) {
@@ -214,11 +231,9 @@ io.on("connection", (socket) => {
     console.log(`Spectator assigned: ${socket.id}`);
   }
 
-  // Enviar estado actual
   broadcastPlayersUpdate();
   socket.emit("gameStateUpdate", gameState.game);
 
-  // Manejar acciones del jugador
   socket.on("playerAction", (data) => {
     if (socket.id === gameState.player1) {
       gameState.player1Keys = data.keys;
@@ -227,7 +242,6 @@ io.on("connection", (socket) => {
     }
   });
 
-  // Manejar inicio de juego
   socket.on("startGame", () => {
     console.log("Game started by:", socket.id);
     gameState.game = {
@@ -251,9 +265,8 @@ io.on("connection", (socket) => {
     broadcastGameState();
   });
 
-  // Manejar desconexión
   socket.on("disconnect", () => {
-    console.log("User disconnected: " + socket.id);
+    console.log("User disconnected:", socket.id);
 
     if (gameState.player1 === socket.id) {
       gameState.player1 = null;
@@ -265,7 +278,6 @@ io.on("connection", (socket) => {
       console.log("Player 2 disconnected");
     }
 
-    // Pausar juego si alguien se desconecta
     if (gameState.game.gameStarted) {
       gameState.game.gameStarted = false;
       clearInterval(gameLoopInterval);
@@ -277,4 +289,7 @@ io.on("connection", (socket) => {
   });
 });
 
-console.log(`Socket.IO server running on port ${PORT}`);
+// Iniciar servidor
+server.listen(PORT, () => {
+  console.log(`Socket.IO server running on port ${PORT}`);
+});
