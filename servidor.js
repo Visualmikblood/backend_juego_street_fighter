@@ -290,7 +290,7 @@ io.on("connection", (socket) => {
     clearInterval(gameLoopInterval);
     clearInterval(gameTimer);
 
-    // Reiniciar estado del juego
+    // Reiniciar estado del juego  sdfsf
     gameState.game = {
       player1: {
         x: 100, y: 300, hp: 100, maxHp: 100, facing: 'right',
