@@ -116,7 +116,7 @@ const gameLoop = () => {
     const newGame = { ...gameState.game };
 
     // Procesamiento de inputs del jugador 1
-    const p1Keys = gameState.player1Keys;
+    const p1Keys = gameState.player1Keys || {};
     if (p1Keys['a'] && newGame.player1.x > 50) newGame.player1.x -= 5;
     if (p1Keys['d'] && newGame.player1.x < 720) newGame.player1.x += 5;
     if (p1Keys['w'] && !newGame.player1.isJumping) {
@@ -124,18 +124,14 @@ const gameLoop = () => {
       newGame.player1.jumpVelocity = -15;
     }
     newGame.player1.isBlocking = p1Keys['g'] || false;
-    newGame.player1.facing = p1Keys['a'] ? 'left' : p1Keys['d'] ? 'right' : newGame.player1.facing;
-
-    // Ataques jugador 1
+    // Ataque normal
     if (p1Keys['f'] && !newGame.player1.isAttacking) {
       newGame.player1.isAttacking = true;
+      newGame.player1.lastAttackTime = Date.now();
       const result = performAttack(newGame.player1, newGame.player2);
       newGame.player2.hp = result.hp;
       newGame.player1.combo = result.breakCombo ? 0 : newGame.player1.combo + 1;
-      setTimeout(() => {
-        gameState.game.player1.isAttacking = false;
-        broadcastGameState();
-      }, 200);
+      setTimeout(() => { newGame.player1.isAttacking = false; broadcastGameState(); }, 200);
     }
 
     if (p1Keys['h'] && newGame.player1.special >= 50) {
@@ -275,16 +271,16 @@ io.on("connection", (socket) => {
   // Manejo de acciones (actualizado para coincidir con frontend)
   socket.on("playerAction", (keys) => {
     if (socket.id === gameState.player1) {
-      gameState.player1Keys = keys;
+      gameState.player1Keys = keys.keys;
     } else if (socket.id === gameState.player2) {
-      gameState.player2Keys = keys;
+      gameState.player2Keys = keys.keys;
     }
   });
 
   // Inicio del juego con validación
   socket.on("startGame", () => {
     if ((socket.id !== gameState.player1 && socket.id !== gameState.player2) || 
-        gameState.game.gameStarted) {
+        (gameState.game.gameStarted && !gameState.game.winner)) {
       return;
     }
 
