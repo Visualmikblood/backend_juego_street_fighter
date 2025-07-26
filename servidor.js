@@ -1,15 +1,18 @@
 import express from 'express';
+import cors from 'cors';
 import { Server } from 'socket.io';
 import { createServer } from 'http';
 
 const app = express();
-const server = createServer(app);
-
-// Configuración de puerto - Usa el puerto de Railway o 3001 por defecto
-const PORT = process.env.PORT || 3001;
 
 // Configuración CORS - Usa la variable de entorno o permite todos en desarrollo
 const CORS_ORIGIN = process.env.CORS_ORIGIN || "*";
+app.use(cors({
+  origin: CORS_ORIGIN.split(','),
+  credentials: true
+}));
+
+const server = createServer(app);
 
 // Variables para control de intervalos
 let gameLoopInterval = null;
