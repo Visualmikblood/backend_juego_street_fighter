@@ -5,6 +5,8 @@ import { createServer } from 'http';
 
 const app = express();
 
+const PORT = process.env.PORT || 3001;
+
 // Configuración CORS - Usa la variable de entorno o permite todos en desarrollo
 const CORS_ORIGIN = process.env.CORS_ORIGIN || "*";
 app.use(cors({
