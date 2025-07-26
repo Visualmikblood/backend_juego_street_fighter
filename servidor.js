@@ -5,7 +5,9 @@ import { createServer } from 'http';
 
 const app = express();
 
-const PORT = process.env.PORT || 3001;
+// CORREGIDO: Usar el puerto correcto para Railway
+const PORT = process.env.PORT || 8080;
+const HOST = '0.0.0.0'; // IMPORTANTE: Escuchar en todas las interfaces
 
 // Configuración CORS - Usa la variable de entorno o permite todos en desarrollo
 const CORS_ORIGIN = process.env.CORS_ORIGIN || "*";
@@ -56,17 +58,42 @@ let gameState = {
   }
 };
 
-// Configuración básica HTTP (requerido para Railway)
+// CORREGIDO: Ruta de salud para Railway
 app.get('/', (req, res) => {
   const host = req.get('host') || `localhost:${PORT}`;
   res.status(200).json({
     status: 'online',
     message: 'Servidor Street Fighter funcionando',
-    socket: `ws://${host}`,
+    timestamp: new Date().toISOString(),
+    port: PORT,
+    socket: `wss://${host}`, // Usar wss para HTTPS
     players: {
       player1: !!gameState.player1,
-      player2: !!gameState.player2
-    }
+      player2: !!gameState.player2,
+      total: (gameState.player1 ? 1 : 0) + (gameState.player2 ? 1 : 0)
+    },
+    gameStatus: gameState.game.gameStarted ? 'running' : 'waiting'
+  });
+});
+
+// NUEVO: Ruta de health check adicional
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'healthy',
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString()
+  });
+});
+
+// NUEVO: Ruta para obtener estado del juego
+app.get('/api/game-state', (req, res) => {
+  res.status(200).json({
+    players: {
+      player1Connected: !!gameState.player1,
+      player2Connected: !!gameState.player2,
+      total: (gameState.player1 ? 1 : 0) + (gameState.player2 ? 1 : 0)
+    },
+    gameState: gameState.game
   });
 });
 
@@ -290,7 +317,7 @@ io.on("connection", (socket) => {
     clearInterval(gameLoopInterval);
     clearInterval(gameTimer);
 
-    // Reiniciar estado del juego  sdfsf
+    // Reiniciar estado del juego
     gameState.game = {
       player1: {
         x: 100, y: 300, hp: 100, maxHp: 100, facing: 'right',
@@ -345,17 +372,18 @@ io.on("connection", (socket) => {
   });
 });
 
-// Inicio del servidor con manejo de errores
-server.listen(PORT, () => {
+// CORREGIDO: Inicio del servidor con HOST específico
+server.listen(PORT, HOST, () => {
   console.log(`🟢 Servidor iniciado en puerto ${PORT}`);
-  console.log(`🔗 URL HTTP: http://localhost:${PORT}`);
-  console.log(`🔌 WebSocket: ws://localhost:${PORT}`);
+  console.log(`🔗 URL HTTP: http://${HOST}:${PORT}`);
+  console.log(`🔌 WebSocket: ws://${HOST}:${PORT}`);
+  console.log(`🌍 Servidor escuchando en todas las interfaces (${HOST})`);
 }).on('error', (err) => {
   if (err.code === 'EADDRINUSE') {
     console.error(`❌ Error: El puerto ${PORT} está en uso`);
     console.log('👉 Soluciones:');
     console.log(`1. Cambia el puerto en las variables de entorno (ahora usando ${PORT})`);
-    console.log('2. Ejecuta: npx kill-port 3001');
+    console.log('2. Ejecuta: npx kill-port 8080');
     console.log('3. Espera 1-2 minutos y vuelve a intentar');
   } else {
     console.error('Error al iniciar el servidor:', err);
