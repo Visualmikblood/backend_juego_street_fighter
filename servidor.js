@@ -264,8 +264,11 @@ const startGameLoop = () => {
 io.on("connection", (socket) => {
   console.log(`[${new Date().toISOString()}] Nuevo cliente conectado: ${socket.id}`);
 
-  // Asignación de jugador mejorada
-  if (!gameState.player1) {
+  // Asignación robusta de jugador
+  // Si el socket ya está asignado, no reasignar
+  if (socket.id === gameState.player1 || socket.id === gameState.player2) {
+    console.log(`El socket ${socket.id} ya estaba asignado como jugador.`);
+  } else if (!gameState.player1) {
     gameState.player1 = socket.id;
     socket.emit("assignPlayer", {
       role: "player1",
@@ -345,14 +348,22 @@ io.on("connection", (socket) => {
   socket.on("disconnect", () => {
     console.log(`[${new Date().toISOString()}] Cliente desconectado: ${socket.id}`);
 
+    // Liberar correctamente los espacios de jugador
+    let liberado = false;
     if (socket.id === gameState.player1) {
       gameState.player1 = null;
       gameState.player1Keys = {};
+      liberado = true;
       console.log("Jugador 1 desconectado - espacio liberado");
-    } else if (socket.id === gameState.player2) {
+    }
+    if (socket.id === gameState.player2) {
       gameState.player2 = null;
       gameState.player2Keys = {};
+      liberado = true;
       console.log("Jugador 2 desconectado - espacio liberado");
+    }
+    if (!liberado) {
+      console.log("Desconectado un espectador o socket no asignado a jugador.");
     }
 
     // Pausar juego si estaba activo
