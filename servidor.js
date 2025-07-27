@@ -1,5 +1,4 @@
 import express from 'express';
-import cors from 'cors';
 import { Server } from 'socket.io';
 import { createServer } from 'http';
 
@@ -9,52 +8,26 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 const HOST = '0.0.0.0'; // IMPORTANTE: Escuchar en todas las interfaces
 
-// Configuración CORS - Permite todos los orígenes en desarrollo, restringe en producción
-const isLocal = process.env.NODE_ENV !== 'production';
-const corsOrigins = (origin, callback) => {
-  if (isLocal && /^http:\/\/localhost:\d+$/.test(origin)) {
-    // Permite cualquier localhost en desarrollo
-    return callback(null, true);
-  }
-  // En producción, solo los orígenes definidos
-  const allowed = (process.env.CORS_ORIGIN || "*").split(',');
-  if (!origin || allowed.includes(origin)) {
-    return callback(null, true);
-  }
-  return callback(new Error('Not allowed by CORS'));
-};
-app.use(cors({
-  origin: corsOrigins,
-  credentials: true
-}));
+// Fuerza isLocal a true en local (no Railway ni Vercel), así CORS siempre funciona en desarrollo
+const isLocal = !process.env.RAILWAY_STATIC_URL && !process.env.VERCEL;
+console.log('NODE_ENV:', process.env.NODE_ENV, 'isLocal:', isLocal);
 
 const server = createServer(app);
 
-// Variables para control de intervalos
-let gameLoopInterval = null;
-let gameTimer = null;
-
-// Configuración Socket.IO con CORS y recuperación de conexión
 const io = new Server(server, {
   cors: {
-    origin: (origin, callback) => {
-      if (isLocal && /^http:\/\/localhost:\d+$/.test(origin)) {
-        return callback(null, true);
-      }
-      const allowed = (process.env.CORS_ORIGIN || "*").split(',');
-      if (!origin || allowed.includes(origin)) {
-        return callback(null, true);
-      }
-      return callback(new Error('Not allowed by CORS'));
-    },
-    methods: ["GET", "POST"],
-    credentials: true
+    origin: isLocal ? "*" : (process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : []),
+    methods: ["GET", "POST"]
   },
   connectionStateRecovery: {
     maxDisconnectionDuration: 120000,
     skipMiddlewares: true
   }
 });
+
+// Variables para control de intervalos
+let gameLoopInterval = null;
+let gameTimer = null;
 
 // Estado del juego
 let gameState = {
