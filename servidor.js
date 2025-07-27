@@ -15,21 +15,37 @@ const isLocal = !isRailway && !isVercel;
 
 console.log('NODE_ENV:', process.env.NODE_ENV, 'isLocal:', isLocal, 'isRailway:', isRailway, 'isVercel:', isVercel);
 
+// --- Helper para aceptar previews de Vercel ---
+function isAllowedOrigin(origin) {
+  if (!origin) return false;
+  // Permitir todos los *.vercel.app
+  if (/^https:\/\/[a-zA-Z0-9-]+\.vercel\.app$/.test(origin)) return true;
+  // Permitir los orígenes definidos en CORS_ORIGIN
+  if (process.env.CORS_ORIGIN && process.env.CORS_ORIGIN.split(",").includes(origin)) return true;
+  return false;
+}
+
 const server = createServer(app);
 
-// --- Configuración de Socket.IO con CORS dinámico ---
+// --- Configuración de Socket.IO con CORS dinámico y automatización de previews ---
 const io = new Server(server, {
   cors: isLocal
     ? { origin: "*" }
     : {
-        origin: process.env.CORS_ORIGIN.split(","),
+        origin: (origin, callback) => {
+          if (isAllowedOrigin(origin)) {
+            callback(null, true);
+          } else {
+            callback(new Error("Not allowed by CORS"));
+          }
+        },
         methods: ["GET", "POST"],
         credentials: true,
       },
   connectionStateRecovery: {
     maxDisconnectionDuration: 120000,
     skipMiddlewares: true
-  }
+  },
 });
 
 // Variables para control de intervalos
