@@ -8,17 +8,24 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 const HOST = '0.0.0.0'; // IMPORTANTE: Escuchar en todas las interfaces
 
-// Fuerza isLocal a true en local (no Railway ni Vercel), así CORS siempre funciona en desarrollo
-const isLocal = !process.env.RAILWAY_STATIC_URL && !process.env.VERCEL;
-console.log('NODE_ENV:', process.env.NODE_ENV, 'isLocal:', isLocal);
+// --- Detección de entorno robusta para CORS ---
+const isRailway = !!process.env.RAILWAY_STATIC_URL;
+const isVercel = !!process.env.VERCEL;
+const isLocal = !isRailway && !isVercel;
+
+console.log('NODE_ENV:', process.env.NODE_ENV, 'isLocal:', isLocal, 'isRailway:', isRailway, 'isVercel:', isVercel);
 
 const server = createServer(app);
 
+// --- Configuración de Socket.IO con CORS dinámico ---
 const io = new Server(server, {
-  cors: {
-    origin: isLocal ? "*" : (process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : []),
-    methods: ["GET", "POST"]
-  },
+  cors: isLocal
+    ? { origin: "*" }
+    : {
+        origin: process.env.CORS_ORIGIN.split(","),
+        methods: ["GET", "POST"],
+        credentials: true,
+      },
   connectionStateRecovery: {
     maxDisconnectionDuration: 120000,
     skipMiddlewares: true
