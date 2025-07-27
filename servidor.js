@@ -25,8 +25,9 @@ let gameTimer = null;
 // Configuración Socket.IO con CORS y recuperación de conexión
 const io = new Server(server, {
   cors: {
-    origin: CORS_ORIGIN,
-    methods: ["GET", "POST"]
+    origin: CORS_ORIGIN.split(','),
+    methods: ["GET", "POST"],
+    credentials: true
   },
   connectionStateRecovery: {
     maxDisconnectionDuration: 120000,
