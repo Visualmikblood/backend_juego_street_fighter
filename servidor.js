@@ -33,12 +33,15 @@ const io = new Server(server, {
     ? { origin: "*" }
     : {
         origin: (origin, callback) => {
-          if (isAllowedOrigin(origin)) {
-            callback(null, true);
-          } else {
-            callback(new Error("Not allowed by CORS"));
-          }
-        },
+  console.log("[CORS] Origin recibido en callback:", origin);
+  if (isAllowedOrigin(origin)) {
+    console.log("[CORS] Origin PERMITIDO:", origin);
+    callback(null, true);
+  } else {
+    console.log("[CORS] Origin RECHAZADO:", origin);
+    callback(new Error("Not allowed by CORS"));
+  }
+},
         methods: ["GET", "POST"],
         credentials: true,
       },
