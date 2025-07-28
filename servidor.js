@@ -61,6 +61,8 @@ let gameState = {
   player2: null,
   player1Keys: {},
   player2Keys: {},
+  player1IsMobile: false,
+  player2IsMobile: false,
   game: {
     player1: {
       x: 100, y: 300, hp: 100, maxHp: 100, facing: 'right',
@@ -165,39 +167,161 @@ const gameLoop = () => {
 
     // Procesamiento de inputs del jugador 1
     const p1Keys = gameState.player1Keys || {};
-    // Movimiento por toque único (solo un paso por input)
-    if (p1Keys['a'] && newGame.player1.x > 50) {
-      newGame.player1.x -= 5;
-      gameState.player1Keys['a'] = false;
-    }
-    if (p1Keys['d'] && newGame.player1.x < 720) {
-      newGame.player1.x += 5;
-      gameState.player1Keys['d'] = false;
-    }
-    // Salto de toque único
-    if (p1Keys['w'] && !newGame.player1.isJumping) {
-      newGame.player1.isJumping = true;
-      newGame.player1.jumpVelocity = -15;
-      gameState.player1Keys['w'] = false;
-    }
-    // Bloqueo de toque único
-    if (p1Keys['g']) {
-      newGame.player1.isBlocking = true;
-      gameState.player1Keys['g'] = false;
+    // --- Diferenciar lógica móvil/PC ---
+    if (gameState.player1IsMobile) {
+      // Movimiento por toque único (solo un paso por input)
+      if (p1Keys['a'] && newGame.player1.x > 50) {
+        newGame.player1.x -= 5;
+        gameState.player1Keys['a'] = false;
+      }
+      if (p1Keys['d'] && newGame.player1.x < 720) {
+        newGame.player1.x += 5;
+        gameState.player1Keys['d'] = false;
+      }
+      // Salto de toque único
+      if (p1Keys['w'] && !newGame.player1.isJumping) {
+        newGame.player1.isJumping = true;
+        newGame.player1.jumpVelocity = -15;
+        gameState.player1Keys['w'] = false;
+      }
+      // Bloqueo de toque único
+      if (p1Keys['g']) {
+        newGame.player1.isBlocking = true;
+        gameState.player1Keys['g'] = false;
+      } else {
+        newGame.player1.isBlocking = false;
+      }
+      // Ataque normal de toque único
+      if (p1Keys['f'] && !newGame.player1.isAttacking) {
+        newGame.player1.isAttacking = true;
+        newGame.player1.lastAttackTime = Date.now();
+        const result = performAttack(newGame.player1, newGame.player2);
+        newGame.player2.hp = result.hp;
+        newGame.player1.combo = result.breakCombo ? 0 : newGame.player1.combo + 1;
+        setTimeout(() => { newGame.player1.isAttacking = false; broadcastGameState(); }, 200);
+        gameState.player1Keys['f'] = false;
+      }
+      // Especial de toque único
+      if (p1Keys['h'] && newGame.player1.special >= 100 && !newGame.player1.isAttacking) {
+        newGame.player1.isAttacking = true;
+        newGame.player1.lastAttackTime = Date.now();
+        const result = performAttack(newGame.player1, newGame.player2, 'special');
+        newGame.player2.hp = result.hp;
+        newGame.player1.combo = result.breakCombo ? 0 : newGame.player1.combo + 1;
+        newGame.player1.special = 0;
+        setTimeout(() => { newGame.player1.isAttacking = false; broadcastGameState(); }, 400);
+        gameState.player1Keys['h'] = false;
+      }
     } else {
-      newGame.player1.isBlocking = false;
+      // --- PC: movimiento/ataque continuo mientras la tecla esté pulsada ---
+      if (p1Keys['a'] && newGame.player1.x > 50) {
+        newGame.player1.x -= 5;
+      }
+      if (p1Keys['d'] && newGame.player1.x < 720) {
+        newGame.player1.x += 5;
+      }
+      if (p1Keys['w'] && !newGame.player1.isJumping) {
+        newGame.player1.isJumping = true;
+        newGame.player1.jumpVelocity = -15;
+      }
+      if (p1Keys['g']) {
+        newGame.player1.isBlocking = true;
+      } else {
+        newGame.player1.isBlocking = false;
+      }
+      if (p1Keys['f'] && !newGame.player1.isAttacking) {
+        newGame.player1.isAttacking = true;
+        newGame.player1.lastAttackTime = Date.now();
+        const result = performAttack(newGame.player1, newGame.player2);
+        newGame.player2.hp = result.hp;
+        newGame.player1.combo = result.breakCombo ? 0 : newGame.player1.combo + 1;
+        setTimeout(() => { newGame.player1.isAttacking = false; broadcastGameState(); }, 200);
+      }
+      if (p1Keys['h'] && newGame.player1.special >= 100 && !newGame.player1.isAttacking) {
+        newGame.player1.isAttacking = true;
+        newGame.player1.lastAttackTime = Date.now();
+        const result = performAttack(newGame.player1, newGame.player2, 'special');
+        newGame.player2.hp = result.hp;
+        newGame.player1.combo = result.breakCombo ? 0 : newGame.player1.combo + 1;
+        newGame.player1.special = 0;
+        setTimeout(() => { newGame.player1.isAttacking = false; broadcastGameState(); }, 400);
+      }
     }
-    // Ataque normal de toque único
-    if (p1Keys['f'] && !newGame.player1.isAttacking) {
-      newGame.player1.isAttacking = true;
-      newGame.player1.lastAttackTime = Date.now();
-      const result = performAttack(newGame.player1, newGame.player2);
-      newGame.player2.hp = result.hp;
-      newGame.player1.combo = result.breakCombo ? 0 : newGame.player1.combo + 1;
-      setTimeout(() => { newGame.player1.isAttacking = false; broadcastGameState(); }, 200);
-      gameState.player1Keys['f'] = false;
+    // Procesamiento de inputs del jugador 2 (idéntico, adaptado a isMobile)
+    const p2Keys = gameState.player2Keys || {};
+    if (gameState.player2IsMobile) {
+      if (p2Keys['a'] && newGame.player2.x > 50) {
+        newGame.player2.x -= 5;
+        gameState.player2Keys['a'] = false;
+      }
+      if (p2Keys['d'] && newGame.player2.x < 720) {
+        newGame.player2.x += 5;
+        gameState.player2Keys['d'] = false;
+      }
+      if (p2Keys['w'] && !newGame.player2.isJumping) {
+        newGame.player2.isJumping = true;
+        newGame.player2.jumpVelocity = -15;
+        gameState.player2Keys['w'] = false;
+      }
+      if (p2Keys['g']) {
+        newGame.player2.isBlocking = true;
+        gameState.player2Keys['g'] = false;
+      } else {
+        newGame.player2.isBlocking = false;
+      }
+      if (p2Keys['f'] && !newGame.player2.isAttacking) {
+        newGame.player2.isAttacking = true;
+        newGame.player2.lastAttackTime = Date.now();
+        const result = performAttack(newGame.player2, newGame.player1);
+        newGame.player1.hp = result.hp;
+        newGame.player2.combo = result.breakCombo ? 0 : newGame.player2.combo + 1;
+        setTimeout(() => { newGame.player2.isAttacking = false; broadcastGameState(); }, 200);
+        gameState.player2Keys['f'] = false;
+      }
+      if (p2Keys['h'] && newGame.player2.special >= 100 && !newGame.player2.isAttacking) {
+        newGame.player2.isAttacking = true;
+        newGame.player2.lastAttackTime = Date.now();
+        const result = performAttack(newGame.player2, newGame.player1, 'special');
+        newGame.player1.hp = result.hp;
+        newGame.player2.combo = result.breakCombo ? 0 : newGame.player2.combo + 1;
+        newGame.player2.special = 0;
+        setTimeout(() => { newGame.player2.isAttacking = false; broadcastGameState(); }, 400);
+        gameState.player2Keys['h'] = false;
+      }
+    } else {
+      if (p2Keys['a'] && newGame.player2.x > 50) {
+        newGame.player2.x -= 5;
+      }
+      if (p2Keys['d'] && newGame.player2.x < 720) {
+        newGame.player2.x += 5;
+      }
+      if (p2Keys['w'] && !newGame.player2.isJumping) {
+        newGame.player2.isJumping = true;
+        newGame.player2.jumpVelocity = -15;
+      }
+      if (p2Keys['g']) {
+        newGame.player2.isBlocking = true;
+      } else {
+        newGame.player2.isBlocking = false;
+      }
+      if (p2Keys['f'] && !newGame.player2.isAttacking) {
+        newGame.player2.isAttacking = true;
+        newGame.player2.lastAttackTime = Date.now();
+        const result = performAttack(newGame.player2, newGame.player1);
+        newGame.player1.hp = result.hp;
+        newGame.player2.combo = result.breakCombo ? 0 : newGame.player2.combo + 1;
+        setTimeout(() => { newGame.player2.isAttacking = false; broadcastGameState(); }, 200);
+      }
+      if (p2Keys['h'] && newGame.player2.special >= 100 && !newGame.player2.isAttacking) {
+        newGame.player2.isAttacking = true;
+        newGame.player2.lastAttackTime = Date.now();
+        const result = performAttack(newGame.player2, newGame.player1, 'special');
+        newGame.player1.hp = result.hp;
+        newGame.player2.combo = result.breakCombo ? 0 : newGame.player2.combo + 1;
+        newGame.player2.special = 0;
+        setTimeout(() => { newGame.player2.isAttacking = false; broadcastGameState(); }, 400);
+      }
     }
-    // Especial de toque único
     if (p1Keys['h'] && newGame.player1.special >= 50) {
       newGame.player1.special -= 50;
       const result = performAttack(newGame.player1, newGame.player2, 'special');
@@ -354,8 +478,10 @@ io.on("connection", (socket) => {
   socket.on("playerAction", (keys) => {
     if (socket.id === gameState.player1) {
       gameState.player1Keys = keys.keys;
+      gameState.player1IsMobile = !!keys.isMobile;
     } else if (socket.id === gameState.player2) {
       gameState.player2Keys = keys.keys;
+      gameState.player2IsMobile = !!keys.isMobile;
     }
   });
 
