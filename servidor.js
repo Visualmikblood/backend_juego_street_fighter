@@ -331,7 +331,7 @@ const gameLoop = () => {
     }
 
     // Procesamiento de inputs del jugador 2
-    const p2Keys = gameState.player2Keys;
+    // Ya declarado arriba: const p2Keys = gameState.player2Keys || {};
     // Movimiento por toque único (solo un paso por input)
     if (p2Keys['arrowleft'] && newGame.player2.x > 50) {
       newGame.player2.x -= 5;
