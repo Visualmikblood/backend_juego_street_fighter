@@ -165,14 +165,29 @@ const gameLoop = () => {
 
     // Procesamiento de inputs del jugador 1
     const p1Keys = gameState.player1Keys || {};
-    if (p1Keys['a'] && newGame.player1.x > 50) newGame.player1.x -= 5;
-    if (p1Keys['d'] && newGame.player1.x < 720) newGame.player1.x += 5;
+    // Movimiento por toque único (solo un paso por input)
+    if (p1Keys['a'] && newGame.player1.x > 50) {
+      newGame.player1.x -= 5;
+      gameState.player1Keys['a'] = false;
+    }
+    if (p1Keys['d'] && newGame.player1.x < 720) {
+      newGame.player1.x += 5;
+      gameState.player1Keys['d'] = false;
+    }
+    // Salto de toque único
     if (p1Keys['w'] && !newGame.player1.isJumping) {
       newGame.player1.isJumping = true;
       newGame.player1.jumpVelocity = -15;
+      gameState.player1Keys['w'] = false;
     }
-    newGame.player1.isBlocking = p1Keys['g'] || false;
-    // Ataque normal
+    // Bloqueo de toque único
+    if (p1Keys['g']) {
+      newGame.player1.isBlocking = true;
+      gameState.player1Keys['g'] = false;
+    } else {
+      newGame.player1.isBlocking = false;
+    }
+    // Ataque normal de toque único
     if (p1Keys['f'] && !newGame.player1.isAttacking) {
       newGame.player1.isAttacking = true;
       newGame.player1.lastAttackTime = Date.now();
@@ -180,27 +195,44 @@ const gameLoop = () => {
       newGame.player2.hp = result.hp;
       newGame.player1.combo = result.breakCombo ? 0 : newGame.player1.combo + 1;
       setTimeout(() => { newGame.player1.isAttacking = false; broadcastGameState(); }, 200);
+      gameState.player1Keys['f'] = false;
     }
-
+    // Especial de toque único
     if (p1Keys['h'] && newGame.player1.special >= 50) {
       newGame.player1.special -= 50;
       const result = performAttack(newGame.player1, newGame.player2, 'special');
       newGame.player2.hp = result.hp;
       newGame.player1.combo += 1;
+      gameState.player1Keys['h'] = false;
     }
 
     // Procesamiento de inputs del jugador 2
     const p2Keys = gameState.player2Keys;
-    if (p2Keys['arrowleft'] && newGame.player2.x > 50) newGame.player2.x -= 5;
-    if (p2Keys['arrowright'] && newGame.player2.x < 720) newGame.player2.x += 5;
+    // Movimiento por toque único (solo un paso por input)
+    if (p2Keys['arrowleft'] && newGame.player2.x > 50) {
+      newGame.player2.x -= 5;
+      gameState.player2Keys['arrowleft'] = false;
+    }
+    if (p2Keys['arrowright'] && newGame.player2.x < 720) {
+      newGame.player2.x += 5;
+      gameState.player2Keys['arrowright'] = false;
+    }
+    // Salto de toque único
     if (p2Keys['arrowup'] && !newGame.player2.isJumping) {
       newGame.player2.isJumping = true;
       newGame.player2.jumpVelocity = -15;
+      gameState.player2Keys['arrowup'] = false;
     }
-    newGame.player2.isBlocking = p2Keys['2'] || false;
+    // Bloqueo de toque único
+    if (p2Keys['2']) {
+      newGame.player2.isBlocking = true;
+      gameState.player2Keys['2'] = false;
+    } else {
+      newGame.player2.isBlocking = false;
+    }
     newGame.player2.facing = p2Keys['arrowleft'] ? 'left' : p2Keys['arrowright'] ? 'right' : newGame.player2.facing;
 
-    // Ataques jugador 2
+    // Ataque normal de toque único
     if (p2Keys['1'] && !newGame.player2.isAttacking) {
       newGame.player2.isAttacking = true;
       const result = performAttack(newGame.player2, newGame.player1);
@@ -210,13 +242,15 @@ const gameLoop = () => {
         gameState.game.player2.isAttacking = false;
         broadcastGameState();
       }, 200);
+      gameState.player2Keys['1'] = false;
     }
-
+    // Especial de toque único
     if (p2Keys['3'] && newGame.player2.special >= 50) {
       newGame.player2.special -= 50;
       const result = performAttack(newGame.player2, newGame.player1, 'special');
       newGame.player1.hp = result.hp;
       newGame.player2.combo += 1;
+      gameState.player2Keys['3'] = false;
     }
 
     // Física del juego
@@ -319,13 +353,9 @@ io.on("connection", (socket) => {
   // Manejo de acciones (actualizado para coincidir con frontend)
   socket.on("playerAction", (keys) => {
     if (socket.id === gameState.player1) {
-      if (JSON.stringify(gameState.player1Keys) !== JSON.stringify(keys.keys)) {
-        gameState.player1Keys = keys.keys;
-      }
+      gameState.player1Keys = keys.keys;
     } else if (socket.id === gameState.player2) {
-      if (JSON.stringify(gameState.player2Keys) !== JSON.stringify(keys.keys)) {
-        gameState.player2Keys = keys.keys;
-      }
+      gameState.player2Keys = keys.keys;
     }
   });
 
