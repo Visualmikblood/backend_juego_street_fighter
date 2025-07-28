@@ -319,9 +319,13 @@ io.on("connection", (socket) => {
   // Manejo de acciones (actualizado para coincidir con frontend)
   socket.on("playerAction", (keys) => {
     if (socket.id === gameState.player1) {
-      gameState.player1Keys = keys.keys;
+      if (JSON.stringify(gameState.player1Keys) !== JSON.stringify(keys.keys)) {
+        gameState.player1Keys = keys.keys;
+      }
     } else if (socket.id === gameState.player2) {
-      gameState.player2Keys = keys.keys;
+      if (JSON.stringify(gameState.player2Keys) !== JSON.stringify(keys.keys)) {
+        gameState.player2Keys = keys.keys;
+      }
     }
   });
 
